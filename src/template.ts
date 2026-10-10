@@ -3,6 +3,7 @@ import coolingIcon from "@material-symbols/svg-400/outlined/air.svg";
 import ledModeIcon from "@material-symbols/svg-400/outlined/backlight_high.svg";
 import batteryChargingIcon from "@material-symbols/svg-400/outlined/battery_charging_full.svg";
 import batteryIcon from "@material-symbols/svg-400/outlined/battery_full.svg";
+import mealDatesIcon from "@material-symbols/svg-400/outlined/calendar_month.svg";
 import feedingTimeIcon from "@material-symbols/svg-400/outlined/cookie.svg";
 import lidIcon from "@material-symbols/svg-400/outlined/earbud_case.svg";
 import errorIcon from "@material-symbols/svg-400/outlined/error.svg";
@@ -16,7 +17,7 @@ import { html, noChange, type TemplateResult } from "lit";
 import { live } from "lit/directives/live.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import plateSvg from "../assets/plate.svg";
-import type { PlaRemote } from "./app";
+import type { PlaRemote, UpcomingDay, UpcomingMeal, UpcomingMeals } from "./app";
 import { ENTITIES, type Entity } from "./entities";
 
 type PerMeal<T, Meals = typeof ENTITIES.feedTimes> = { readonly [K in keyof Meals]: T };
@@ -120,6 +121,108 @@ function numberStepper(remote: PlaRemote, entity: Entity, suffix: string, { zero
   `;
 }
 
+function upcomingMealRow(meal: UpcomingMeal): TemplateResult {
+  return html`<div class="flex items-center gap-2">
+    <span
+      class="flex items-center gap-2 shrink-0 rounded-full pl-1 pr-3 py-1 text-bg ${MEAL_CHIPS[meal.index] ?? MEAL_CHIPS[0]} ${meal.past
+        ? "opacity-45"
+        : ""}"
+    >
+      <span
+        class="h-6 min-w-6 @min-[260px]:w-22 px-1.5 shrink-0 rounded-full bg-black/15 flex items-center justify-center text-xs font-extrabold whitespace-nowrap"
+        ><span class="hidden @min-[260px]:inline">${meal.name}</span><span class="@min-[260px]:hidden">${meal.index + 1}</span></span
+      >
+      <span class="min-w-17 text-sm font-bold tabular-nums whitespace-nowrap">${meal.timeText}</span>
+    </span>
+    <span class="ml-auto text-xs text-text-muted whitespace-nowrap" ?hidden=${!meal.countdownText}>${meal.countdownText}</span>
+    <span class="ml-auto text-xs text-text-muted whitespace-nowrap" ?hidden=${!meal.past}>Past</span>
+  </div>`;
+}
+
+function upcomingDay(day: UpcomingDay): TemplateResult {
+  const noMeals = day.meals.length === 0;
+  return html`<li class="flex gap-3.5 py-2.5 border-t border-tray first:border-t-0 first:pt-0 last:pb-0 ${noMeals ? "opacity-60" : ""}">
+    <div
+      class="w-12 shrink-0 self-start rounded-sm flex flex-col items-center py-1.5 ${day.isToday
+        ? "bg-accent-soft text-accent-dark"
+        : "bg-tray text-text"}"
+    >
+      <span class="text-[10px] font-bold uppercase tracking-[0.5px] leading-none">${day.monthText}</span>
+      <span class="text-xl font-extrabold leading-none mt-1">${day.dayOfMonthText}</span>
+    </div>
+    <div class="@container flex-1 min-w-0">
+      <div class="text-sm font-bold ${day.isToday ? "text-accent-dark" : ""}">${day.title}</div>
+      ${noMeals
+        ? html`<div class="text-xs text-text-muted mt-0.5">No meals</div>`
+        : html`<div class="flex flex-col gap-1.5 mt-1.5">${day.meals.map(upcomingMealRow)}</div>`}
+    </div>
+  </li>`;
+}
+
+function upcomingMealsCard(upcoming: UpcomingMeals): TemplateResult {
+  let body: TemplateResult;
+  if (upcoming.off) {
+    body = html`<p class="m-0 text-sm text-text-muted">The feeding schedule is off, so no meals will be served automatically.</p>`;
+  } else if (upcoming.days.length === 0) {
+    body = html`<p class="m-0 text-sm text-text-muted">No upcoming meals.</p>`;
+  } else {
+    body = html`<ol class="list-none m-0 p-0">${upcoming.days.map(upcomingDay)}</ol>`;
+  }
+  return html`<div class="card">
+    <div class="card-title">
+      <h2>Upcoming Meals</h2>
+      <span class="rounded-full bg-tray px-2.5 py-1 text-xs font-semibold text-text-muted">${upcoming.periodText}</span>
+    </div>
+    ${body}
+  </div>`;
+}
+
+// Muted while every meal is on the same day, so daily schedules barely notice it
+function mealDatesButton(remote: PlaRemote): TemplateResult {
+  let tone = "bg-transparent text-text-muted";
+  if (remote.showMealDates) tone = "bg-tray text-accent-dark";
+  else if (remote.multiDaySchedule) tone = "bg-transparent text-accent-dark";
+  return html`<button
+    class="w-7.5 h-7.5 rounded-sm border-0 flex items-center justify-center cursor-pointer ${tone}"
+    title="Meal dates"
+    aria-label="Meal dates"
+    aria-controls="meal-dates"
+    aria-expanded=${remote.showMealDates ? "true" : "false"}
+    @click=${() => remote.toggleMealDates()}
+  >
+    ${msIcon(mealDatesIcon, "w-4.5 h-4.5")}
+  </button>`;
+}
+
+function mealDatesEditor(remote: PlaRemote): TemplateResult {
+  return html`<div id="meal-dates" class="mt-4 pt-3 border-t border-tray flex flex-col gap-2">
+    <p class="m-0 text-xs leading-snug text-text-muted">
+      Meals on different dates make the schedule repeat every few days instead of daily.
+    </p>
+    ${ENTITIES.mealDates.map(
+      (date, i) => html`
+        <label class="flex items-center justify-between gap-2 text-sm font-semibold">
+          <span class="flex items-center gap-2 min-w-0">
+            <span class="w-2.5 h-2.5 shrink-0 rounded-full ${MEAL_CHIPS[i] ?? MEAL_CHIPS[0]}"></span>
+            ${ENTITIES.feedTimes[i]?.name ?? date.name}
+          </span>
+          <input
+            type="date"
+            required
+            aria-label=${date.name}
+            class="rounded-sm border-0 bg-black/20 px-2 py-1 text-sm font-bold text-inherit font-[inherit] [color-scheme:dark] outline-none focus:bg-tray focus:ring-2 focus:ring-accent"
+            .value=${remote.isEditingMealDate(i) ? noChange : live(remote.mealDateValue(i))}
+            @focus=${() => remote.onMealDateFocus(i)}
+            @keydown=${(e: KeyboardEvent) => remote.onMealDateKeydown(e)}
+            @blur=${(e: Event) => remote.onMealDateBlur(i, e)}
+            @change=${(e: Event) => remote.onMealDateChange(i, e)}
+          />
+        </label>
+      `,
+    )}
+  </div>`;
+}
+
 export function renderTemplate(remote: PlaRemote): TemplateResult {
   const nextMeal = remote.nextMeal;
   return html`
@@ -200,7 +303,10 @@ export function renderTemplate(remote: PlaRemote): TemplateResult {
     <div class="card">
       <div class="card-title">
         <h2>Feeding Schedule</h2>
-        ${switchToggle(remote.isOn(ENTITIES.schedule), (e) => remote.setSwitch(ENTITIES.schedule, e))}
+        <div class="flex items-center gap-2">
+          ${mealDatesButton(remote)}
+          ${switchToggle(remote.isOn(ENTITIES.schedule), (e) => remote.setSwitch(ENTITIES.schedule, e))}
+        </div>
       </div>
       <div class="flex items-center gap-4.5">
         ${plate((i) => MEAL_COLORS[i] ?? null)}
@@ -226,7 +332,10 @@ export function renderTemplate(remote: PlaRemote): TemplateResult {
           )}
         </div>
       </div>
+      ${remote.showMealDates ? mealDatesEditor(remote) : ""}
     </div>
+
+    ${upcomingMealsCard(remote.upcomingMeals)}
 
     <div class="card">
       <div class="card-title">

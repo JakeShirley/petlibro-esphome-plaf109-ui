@@ -42,6 +42,10 @@ const [mealOne, mealTwo, mealThree] = ENTITIES.feedTimes;
 set(mealOne, "07:30:00", "07:30:00");
 set(mealTwo, "12:30:00", "12:30:00");
 set(mealThree, "18:00:00", "18:00:00");
+// all meals on today's date make a daily schedule, set different dates for a multi-day one
+const now = new Date();
+const today = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map((n) => String(n).padStart(2, "0")).join("-");
+for (const date of ENTITIES.mealDates) set(date, today, today);
 for (const button of [ENTITIES.feedNow, ENTITIES.rotatePlate, ENTITIES.doorToggle, ENTITIES.chime]) {
   set(button, null, "");
 }
@@ -108,6 +112,7 @@ const ACTIONS = {
   button: ["press"],
   number: ["set"],
   time: ["set"],
+  date: ["set"],
 };
 
 function handleAction(req, res, parts, query) {
@@ -137,7 +142,7 @@ function handleAction(req, res, parts, query) {
     }
     entity.value = query.get("value");
     entity.state = entity.value;
-  } else if (domain === "time") {
+  } else if (domain === "time" || domain === "date") {
     entity.value = query.get("value");
     entity.state = entity.value;
   }

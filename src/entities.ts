@@ -1,4 +1,4 @@
-export type Domain = "switch" | "sensor" | "binary_sensor" | "text_sensor" | "number" | "button" | "time";
+export type Domain = "switch" | "sensor" | "binary_sensor" | "text_sensor" | "number" | "button" | "time" | "date";
 
 export interface Entity {
   readonly domain: Domain;
@@ -28,6 +28,12 @@ export const ENTITIES = {
     { domain: "time", name: "Meal One" },
     { domain: "time", name: "Meal Two" },
     { domain: "time", name: "Meal Three" },
+  ],
+  // meals on different dates make a multi-day schedule, see projectSchedule
+  mealDates: [
+    { domain: "date", name: "Meal One Date" },
+    { domain: "date", name: "Meal Two Date" },
+    { domain: "date", name: "Meal Three Date" },
   ],
   feedNow: { domain: "button", name: "Feed Now" },
   rotatePlate: { domain: "button", name: "Rotate Plate" },
