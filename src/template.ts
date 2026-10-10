@@ -20,7 +20,7 @@ import { html, noChange, type TemplateResult } from "lit";
 import { live } from "lit/directives/live.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import plateSvg from "../assets/plate.svg";
-import type { PlaRemote } from "./app";
+import type { PlaRemote, UpcomingDay, UpcomingMeal, UpcomingMeals } from "./app";
 import { ENTITIES, type Entity } from "./entities";
 
 type PerMeal<T, Meals = typeof ENTITIES.feedTimes> = { readonly [K in keyof Meals]: T };
@@ -153,6 +153,57 @@ function batteryPill(remote: PlaRemote): TemplateResult {
   `;
 }
 
+function upcomingMealRow(meal: UpcomingMeal): TemplateResult {
+  return html`<div class="flex items-center gap-2">
+    <span class="flex items-center gap-2 shrink-0 rounded-full pl-1 pr-3 py-1 text-bg ${MEAL_CHIPS[meal.index] ?? MEAL_CHIPS[0]}">
+      <span
+        class="h-6 min-w-6 @min-[260px]:w-22 px-1.5 shrink-0 rounded-full bg-black/15 flex items-center justify-center text-xs font-extrabold whitespace-nowrap"
+        ><span class="hidden @min-[260px]:inline">${meal.name}</span><span class="@min-[260px]:hidden">${meal.index + 1}</span></span
+      >
+      <span class="min-w-17 text-sm font-bold tabular-nums whitespace-nowrap">${meal.timeText}</span>
+    </span>
+    <span class="ml-auto text-xs text-text-muted whitespace-nowrap" ?hidden=${!meal.countdownText}>${meal.countdownText}</span>
+  </div>`;
+}
+
+function upcomingDay(day: UpcomingDay): TemplateResult {
+  const noMeals = day.meals.length === 0;
+  return html`<li class="flex gap-3.5 py-2.5 border-t border-tray first:border-t-0 first:pt-0 last:pb-0 ${noMeals ? "opacity-60" : ""}">
+    <div
+      class="w-12 shrink-0 self-start rounded-sm flex flex-col items-center py-1.5 ${day.isToday
+        ? "bg-accent-soft text-accent-dark"
+        : "bg-tray text-text"}"
+    >
+      <span class="text-[10px] font-bold uppercase tracking-[0.5px] leading-none">${day.monthText}</span>
+      <span class="text-xl font-extrabold leading-none mt-1">${day.dayOfMonthText}</span>
+    </div>
+    <div class="@container flex-1 min-w-0">
+      <div class="text-sm font-bold ${day.isToday ? "text-accent-dark" : ""}">${day.title}</div>
+      ${noMeals
+        ? html`<div class="text-xs text-text-muted mt-0.5">No meals</div>`
+        : html`<div class="flex flex-col gap-1.5 mt-1.5">${day.meals.map(upcomingMealRow)}</div>`}
+    </div>
+  </li>`;
+}
+
+function upcomingMealsCard(upcoming: UpcomingMeals): TemplateResult {
+  let body: TemplateResult;
+  if (upcoming.off) {
+    body = html`<p class="m-0 text-sm text-text-muted">The feeding schedule is off, so no meals will be served automatically.</p>`;
+  } else if (upcoming.days.length === 0) {
+    body = html`<p class="m-0 text-sm text-text-muted">No upcoming meals.</p>`;
+  } else {
+    body = html`<ol class="list-none m-0 p-0">${upcoming.days.map(upcomingDay)}</ol>`;
+  }
+  return html`<div class="card">
+    <div class="card-title">
+      <h2>Upcoming Meals</h2>
+      <span class="rounded-full bg-tray px-2.5 py-1 text-xs font-semibold text-text-muted">${upcoming.periodText}</span>
+    </div>
+    ${body}
+  </div>`;
+}
+
 export function renderTemplate(remote: PlaRemote): TemplateResult {
   const nextMeal = remote.nextMeal;
   return html`
@@ -283,6 +334,8 @@ export function renderTemplate(remote: PlaRemote): TemplateResult {
       </div>
     </div>
 
+    ${upcomingMealsCard(remote.upcomingMeals)}
+
     <div class="card">
       <div class="card-title">
         <h2>Pet Presence</h2>
@@ -356,8 +409,8 @@ export function renderTemplate(remote: PlaRemote): TemplateResult {
         remote,
         arrivalTimeoutIcon,
         "Arrival Timeout",
-        "How long to wait for your pet once a meal is served. If they don't show up, the lid will close, and the plate won't rotate.",
-        numberStepper(remote, ENTITIES.arrivalTimeout, "minute", { editable: true, label: "Arrival Timeout" }),
+        "How long to wait for your pet once a meal is served. If they don't show up, the lid will close, and the plate won't rotate. Turn off to keep the lid open until your pet arrives.",
+        numberStepper(remote, ENTITIES.arrivalTimeout, "minute", { zeroText: "Off", editable: true, label: "Arrival Timeout" }),
       )}
       ${settingRow(
         remote,

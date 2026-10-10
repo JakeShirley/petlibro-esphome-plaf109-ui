@@ -1,6 +1,15 @@
 import { LitElement, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { ENTITIES, type Entity, entityId } from "./entities";
+import {
+  atLocalTime,
+  dayNumber,
+  groupByDay,
+  parseDateToDay,
+  parseTimeToSeconds,
+  projectSchedule,
+  type Schedule,
+} from "./schedule";
 import { renderTemplate } from "./template";
 
 if (!document.querySelector('meta[name="viewport"]')) {
@@ -49,6 +58,23 @@ function formatDuration(totalSeconds: number): string {
     seconds: s % 60,
   };
   return durationFormat.format(duration) || "0s";
+}
+
+const monthFormat = new Intl.DateTimeFormat([], { month: "short" });
+const weekdayFormat = new Intl.DateTimeFormat([], { weekday: "long" });
+const monthDayFormat = new Intl.DateTimeFormat([], { month: "short", day: "numeric" });
+
+function formatDayTitle(day: number, today: number): string {
+  if (day === today) return "Today";
+  if (day === today + 1) return "Tomorrow";
+  return weekdayFormat.format(atLocalTime(day, 0));
+}
+
+// Only for meals within a day, further out the day title says enough
+function formatCountdown(ms: number): string | null {
+  const totalMinutes = Math.max(1, Math.ceil(ms / 60000));
+  if (totalMinutes > 24 * 60) return null;
+  return "in " + durationFormat.format({ hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 });
 }
 
 // Strips the "(config hash 0x...)" part out of the version.text_sensor state
@@ -110,6 +136,29 @@ interface NextMeal {
   index: number | null; // null when no meal is coming up
   label: string;
   timeText: string;
+}
+
+const UPCOMING_MEAL_COUNT = 6;
+
+export interface UpcomingMeal {
+  index: number; // 0 = meal one
+  name: string;
+  timeText: string;
+  countdownText: string | null;
+}
+
+export interface UpcomingDay {
+  monthText: string;
+  dayOfMonthText: string;
+  title: string;
+  isToday: boolean;
+  meals: UpcomingMeal[]; // empty for days without meals
+}
+
+export interface UpcomingMeals {
+  off: boolean;
+  periodText: string;
+  days: UpcomingDay[];
 }
 
 export class PlaRemote extends LitElement {
@@ -241,25 +290,64 @@ export class PlaRemote extends LitElement {
     return d.state ? formatFirmwareVersion(d.state) : "--";
   }
 
+  get scheduleOff(): boolean {
+    return !!this.entityState(ENTITIES.schedule) && !this.isOn(ENTITIES.schedule);
+  }
+
+  private projectSchedule(now: Date, count: number): Schedule {
+    const slots = ENTITIES.feedTimes.map((meal, i) => {
+      const date = ENTITIES.mealDates[i];
+      return {
+        date: parseDateToDay(date ? this.str(date) : undefined),
+        time: parseTimeToSeconds(this.str(meal)),
+      };
+    });
+    return projectSchedule(slots, now, count);
+  }
+
   get nextMeal(): NextMeal {
-    const schedule = this.entityState(ENTITIES.schedule);
-    if (schedule && !this.isOn(ENTITIES.schedule)) return { index: null, label: "Schedule disabled", timeText: "Off" };
+    if (this.scheduleOff) return { index: null, label: "Schedule disabled", timeText: "Off" };
 
     const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    let best: { index: number; name: string; until: number; minutes: number } | null = null;
-    for (const [index, meal] of ENTITIES.feedTimes.entries()) {
-      const minutes = parseTimeToMinutes(this.str(meal));
-      if (minutes === null) continue;
-      let until = minutes - nowMin;
-      if (until < 0) until += 24 * 60; // already passed today
-      if (best === null || until < best.until) best = { index, name: meal.name, until, minutes };
-    }
+    const next = this.projectSchedule(now, 1).meals[0];
+    if (!next) return { index: null, label: "", timeText: "--:--" };
+    const name = ENTITIES.feedTimes[next.index]?.name ?? "";
+    const today = dayNumber(now);
+    return {
+      index: next.index,
+      label: next.day === today ? name : name + " · " + formatDayTitle(next.day, today),
+      timeText: timeFormat.format(atLocalTime(next.day, next.time)),
+    };
+  }
 
-    if (!best) return { index: null, label: "", timeText: "--:--" };
-    const at = new Date(now);
-    at.setHours(Math.floor(best.minutes / 60), best.minutes % 60, 0, 0);
-    return { index: best.index, label: best.name, timeText: timeFormat.format(at) };
+  get upcomingMeals(): UpcomingMeals {
+    if (this.scheduleOff) return { off: true, periodText: "Off", days: [] };
+
+    const now = new Date();
+    const today = dayNumber(now);
+    const { period, meals } = this.projectSchedule(now, UPCOMING_MEAL_COUNT);
+    const days = groupByDay(meals).map((group): UpcomingDay => {
+      const date = atLocalTime(group.day, 0);
+      return {
+        monthText: monthFormat.format(date),
+        dayOfMonthText: String(date.getDate()),
+        title:
+          group.lastDay > group.day
+            ? monthDayFormat.format(date) + " – " + monthDayFormat.format(atLocalTime(group.lastDay, 0))
+            : formatDayTitle(group.day, today),
+        isToday: group.day === today,
+        meals: group.meals.map((meal) => {
+          const at = atLocalTime(meal.day, meal.time);
+          return {
+            index: meal.index,
+            name: ENTITIES.feedTimes[meal.index]?.name ?? "",
+            timeText: timeFormat.format(at),
+            countdownText: formatCountdown(at.getTime() - now.getTime()),
+          };
+        }),
+      };
+    });
+    return { off: false, periodText: period === 1 ? "Daily" : `Every ${period} days`, days };
   }
 
   private stepOf(entity: Entity): number {
