@@ -16,7 +16,7 @@ import { html, noChange, type TemplateResult } from "lit";
 import { live } from "lit/directives/live.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import plateSvg from "../assets/plate.svg";
-import type { PlaRemote } from "./app";
+import type { PlaRemote, UpcomingDay, UpcomingMeal, UpcomingMeals } from "./app";
 import { ENTITIES, type Entity } from "./entities";
 
 type PerMeal<T, Meals = typeof ENTITIES.feedTimes> = { readonly [K in keyof Meals]: T };
@@ -85,15 +85,90 @@ function switchToggle(checked: boolean, onChange: (e: Event) => void): TemplateR
   `;
 }
 
-function numberStepper(remote: PlaRemote, entity: Entity, suffix: string, zeroText?: string): TemplateResult {
+interface NumberStepperOptions {
+  zeroText?: string; // shown instead of 0, for numbers where 0 means "disabled"
+  editable?: boolean; // lets the value be typed in directly, not just stepped
+  label?: string; // accessible name for the typed input, defaults to the entity name
+}
+
+function numberStepper(remote: PlaRemote, entity: Entity, suffix: string, { zeroText, editable = false, label }: NumberStepperOptions = {}): TemplateResult {
   const stepBtn = "w-7.5 h-7.5 rounded-full border-0 bg-tray text-accent-dark text-base font-extrabold cursor-pointer active:scale-90";
+  const text = remote.numText(entity, suffix, zeroText);
+  // leave the input alone while typing or saving so a state event doesn't overwrite it
+  const inputValue = remote.isEditingNumber(entity) ? noChange : live(text);
+  const value = editable
+    ? html`<input
+        type="text"
+        inputmode="decimal"
+        enterkeyhint="done"
+        autocomplete="off"
+        aria-label=${label ?? entity.name}
+        class="w-18 rounded-sm border-0 bg-black/20 px-1 py-1 text-center text-[15px] font-extrabold text-inherit font-[inherit] cursor-text outline-none focus:bg-tray focus:ring-2 focus:ring-accent"
+        .value=${inputValue}
+        @focus=${(e: Event) => remote.onNumberFocus(entity, e)}
+        @keydown=${(e: KeyboardEvent) => remote.onNumberKeydown(entity, e)}
+        @change=${(e: Event) => remote.onNumberChange(entity, suffix, zeroText, e)}
+        @blur=${(e: Event) => remote.onNumberBlur(entity, suffix, zeroText, e)}
+      />`
+    : html`<span class="min-w-11 text-center font-extrabold text-[15px]">${text}</span>`;
   return html`
     <div class="flex items-center gap-2.5">
       <button class="${stepBtn}" @click=${() => remote.stepNumberEntity(entity, -1)}>−</button>
-      <span class="min-w-11 text-center font-extrabold text-[15px]">${remote.numText(entity, suffix, zeroText)}</span>
+      ${value}
       <button class="${stepBtn}" @click=${() => remote.stepNumberEntity(entity, 1)}>+</button>
     </div>
   `;
+}
+
+function upcomingMealRow(meal: UpcomingMeal): TemplateResult {
+  return html`<div class="flex items-center gap-2">
+    <span class="flex items-center gap-2 shrink-0 rounded-full pl-1 pr-3 py-1 text-bg ${MEAL_CHIPS[meal.index] ?? MEAL_CHIPS[0]}">
+      <span
+        class="h-6 min-w-6 @min-[260px]:w-22 px-1.5 shrink-0 rounded-full bg-black/15 flex items-center justify-center text-xs font-extrabold whitespace-nowrap"
+        ><span class="hidden @min-[260px]:inline">${meal.name}</span><span class="@min-[260px]:hidden">${meal.index + 1}</span></span
+      >
+      <span class="min-w-17 text-sm font-bold tabular-nums whitespace-nowrap">${meal.timeText}</span>
+    </span>
+    <span class="ml-auto text-xs text-text-muted whitespace-nowrap" ?hidden=${!meal.countdownText}>${meal.countdownText}</span>
+  </div>`;
+}
+
+function upcomingDay(day: UpcomingDay): TemplateResult {
+  const noMeals = day.meals.length === 0;
+  return html`<li class="flex gap-3.5 py-2.5 border-t border-tray first:border-t-0 first:pt-0 last:pb-0 ${noMeals ? "opacity-60" : ""}">
+    <div
+      class="w-12 shrink-0 self-start rounded-sm flex flex-col items-center py-1.5 ${day.isToday
+        ? "bg-accent-soft text-accent-dark"
+        : "bg-tray text-text"}"
+    >
+      <span class="text-[10px] font-bold uppercase tracking-[0.5px] leading-none">${day.monthText}</span>
+      <span class="text-xl font-extrabold leading-none mt-1">${day.dayOfMonthText}</span>
+    </div>
+    <div class="@container flex-1 min-w-0">
+      <div class="text-sm font-bold ${day.isToday ? "text-accent-dark" : ""}">${day.title}</div>
+      ${noMeals
+        ? html`<div class="text-xs text-text-muted mt-0.5">No meals</div>`
+        : html`<div class="flex flex-col gap-1.5 mt-1.5">${day.meals.map(upcomingMealRow)}</div>`}
+    </div>
+  </li>`;
+}
+
+function upcomingMealsCard(upcoming: UpcomingMeals): TemplateResult {
+  let body: TemplateResult;
+  if (upcoming.off) {
+    body = html`<p class="m-0 text-sm text-text-muted">The feeding schedule is off, so no meals will be served automatically.</p>`;
+  } else if (upcoming.days.length === 0) {
+    body = html`<p class="m-0 text-sm text-text-muted">No upcoming meals.</p>`;
+  } else {
+    body = html`<ol class="list-none m-0 p-0">${upcoming.days.map(upcomingDay)}</ol>`;
+  }
+  return html`<div class="card">
+    <div class="card-title">
+      <h2>Upcoming Meals</h2>
+      <span class="rounded-full bg-tray px-2.5 py-1 text-xs font-semibold text-text-muted">${upcoming.periodText}</span>
+    </div>
+    ${body}
+  </div>`;
 }
 
 export function renderTemplate(remote: PlaRemote): TemplateResult {
@@ -204,6 +279,8 @@ export function renderTemplate(remote: PlaRemote): TemplateResult {
       </div>
     </div>
 
+    ${upcomingMealsCard(remote.upcomingMeals)}
+
     <div class="card">
       <div class="card-title">
         <h2>Pet Presence</h2>
@@ -277,22 +354,22 @@ export function renderTemplate(remote: PlaRemote): TemplateResult {
         remote,
         arrivalTimeoutIcon,
         "Arrival Timeout",
-        "How long to wait for your pet once a meal is served. If they don't show up, the lid will close, and the plate won't rotate.",
-        numberStepper(remote, ENTITIES.arrivalTimeout, " min"),
+        "How long to wait for your pet once a meal is served. If they don't show up, the lid will close, and the plate won't rotate. Turn off to keep the lid open until your pet arrives.",
+        numberStepper(remote, ENTITIES.arrivalTimeout, " min", { zeroText: "Off", editable: true, label: "Arrival Timeout" }),
       )}
       ${settingRow(
         remote,
         feedingTimeIcon,
         "Feeding Time",
         "Once your pet arrives, how long to keep the lid open.",
-        numberStepper(remote, ENTITIES.minimumFeedingTime, " min"),
+        numberStepper(remote, ENTITIES.minimumFeedingTime, " min", { editable: true, label: "Feeding Time" }),
       )}
       ${settingRow(
         remote,
         chimeIntervalIcon,
         "Chime Interval",
         "While waiting for your pet, chime again every this many seconds until they arrive. Turn off to chime only once per meal.",
-        numberStepper(remote, ENTITIES.chimeInterval, " s", "Off"),
+        numberStepper(remote, ENTITIES.chimeInterval, " s", { zeroText: "Off", editable: true, label: "Chime Interval" }),
       )}
       ${settingRow(
         remote,

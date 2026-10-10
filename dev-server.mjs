@@ -32,8 +32,8 @@ set(ENTITIES.lastVisitTime, lastVisit, lastVisit);
 set(ENTITIES.lastVisitDuration, 92.3, "92.3 s");
 set(ENTITIES.totalVisitTime, 401, "401 s");
 set(ENTITIES.coolingTarget, "40", "40", { min_value: "30", max_value: "70", step: "1" });
-set(ENTITIES.arrivalTimeout, "10", "10", { min_value: "1", max_value: "60", step: "1" });
-set(ENTITIES.minimumFeedingTime, "3", "3", { min_value: "0", max_value: "120", step: "1" });
+set(ENTITIES.arrivalTimeout, "10", "10", { min_value: "0", max_value: "60", step: "1" });
+set(ENTITIES.minimumFeedingTime, "3", "3", { min_value: "0", max_value: "240", step: "1" });
 set(ENTITIES.chimeInterval, "0", "0", { min_value: "0", max_value: "600", step: "5" });
 set(ENTITIES.statusLed, true, "ON");
 set(ENTITIES.firmwareVersion, "2026.9.0 (config hash 0xdeadbeef, built Sep 12 2026, 05:47:00)");
@@ -41,6 +41,10 @@ const [mealOne, mealTwo, mealThree] = ENTITIES.feedTimes;
 set(mealOne, "07:30:00", "07:30:00");
 set(mealTwo, "12:30:00", "12:30:00");
 set(mealThree, "18:00:00", "18:00:00");
+// all meals on today's date make a daily schedule, set different dates for a multi-day one
+const now = new Date();
+const today = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map((n) => String(n).padStart(2, "0")).join("-");
+for (const date of ENTITIES.mealDates) set(date, today, today);
 for (const button of [ENTITIES.feedNow, ENTITIES.rotatePlate, ENTITIES.doorToggle, ENTITIES.chime]) {
   set(button, null, "");
 }
@@ -107,6 +111,7 @@ const ACTIONS = {
   button: ["press"],
   number: ["set"],
   time: ["set"],
+  date: ["set"],
 };
 
 function handleAction(req, res, parts, query) {
@@ -136,7 +141,7 @@ function handleAction(req, res, parts, query) {
     }
     entity.value = query.get("value");
     entity.state = entity.value;
-  } else if (domain === "time") {
+  } else if (domain === "time" || domain === "date") {
     entity.value = query.get("value");
     entity.state = entity.value;
   }
