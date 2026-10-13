@@ -24,6 +24,7 @@ export const ENTITIES = {
   arrivalTimeout: { domain: "number", name: "Arrival Timeout" },
   minimumFeedingTime: { domain: "number", name: "Eating Time" },
   chimeInterval: { domain: "number", name: "Chime Interval" },
+  chimeTimeout: { domain: "number", name: "Chime Timeout" },
   feedTimes: [
     { domain: "time", name: "Meal One" },
     { domain: "time", name: "Meal Two" },

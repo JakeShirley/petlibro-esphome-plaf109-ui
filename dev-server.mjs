@@ -37,6 +37,7 @@ set(ENTITIES.coolingTarget, "40", "40", { min_value: "30", max_value: "70", step
 set(ENTITIES.arrivalTimeout, "10", "10", { min_value: "1", max_value: "1440", step: "1" });
 set(ENTITIES.minimumFeedingTime, "3", "3", { min_value: "0", max_value: "240", step: "1" });
 set(ENTITIES.chimeInterval, "0", "0", { min_value: "0", max_value: "600", step: "5" });
+set(ENTITIES.chimeTimeout, "0", "0", { min_value: "0", max_value: "60", step: "1" });
 set(ENTITIES.statusLed, true, "ON");
 // built time in ESPHome's format, from the last yarn build
 const built = statSync(join(build, "app.js")).mtime;
