@@ -35,6 +35,7 @@ set(ENTITIES.coolingTarget, "40", "40", { min_value: "30", max_value: "70", step
 set(ENTITIES.arrivalTimeout, "10", "10", { min_value: "1", max_value: "60", step: "1" });
 set(ENTITIES.minimumFeedingTime, "3", "3", { min_value: "0", max_value: "120", step: "1" });
 set(ENTITIES.chimeInterval, "0", "0", { min_value: "0", max_value: "600", step: "5" });
+set(ENTITIES.chimeTimeout, "0", "0", { min_value: "0", max_value: "60", step: "1" });
 set(ENTITIES.statusLed, true, "ON");
 set(ENTITIES.firmwareVersion, "2026.9.0 (config hash 0xdeadbeef, built Sep 12 2026, 05:47:00)");
 const [mealOne, mealTwo, mealThree] = ENTITIES.feedTimes;

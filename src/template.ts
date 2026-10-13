@@ -10,6 +10,7 @@ import helpIcon from "@material-symbols/svg-400/outlined/help.svg";
 import targetIcon from "@material-symbols/svg-400/outlined/nest_farsight_cool.svg";
 import chimeIntervalIcon from "@material-symbols/svg-400/outlined/notification_settings.svg";
 import chimeIcon from "@material-symbols/svg-400/outlined/notifications.svg";
+import chimeTimeoutIcon from "@material-symbols/svg-400/outlined/notifications_paused.svg";
 import powerOffIcon from "@material-symbols/svg-400/outlined/power_off.svg";
 import arrivalTimeoutIcon from "@material-symbols/svg-400/outlined/timelapse.svg";
 import { html, noChange, type TemplateResult } from "lit";
@@ -293,6 +294,13 @@ export function renderTemplate(remote: PlaRemote): TemplateResult {
         "Chime Interval",
         "While waiting for your pet, chime again every this many seconds until they arrive. Turn off to chime only once per meal.",
         numberStepper(remote, ENTITIES.chimeInterval, " s", "Off"),
+      )}
+      ${settingRow(
+        remote,
+        chimeTimeoutIcon,
+        "Chime Timeout",
+        "Stop repeating the chime after this many minutes. The lid stays open, and the meal keeps waiting for your pet. Turn off to chime until they arrive.",
+        numberStepper(remote, ENTITIES.chimeTimeout, " min", "Off"),
       )}
       ${settingRow(
         remote,
