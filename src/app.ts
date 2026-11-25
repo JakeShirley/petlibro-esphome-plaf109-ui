@@ -201,6 +201,11 @@ export class PlaRemote extends LitElement {
     return !!this.entityState(ENTITIES.acPower) && !this.isOn(ENTITIES.acPower);
   }
 
+  // false only when the firmware reports no batteries; older firmware without the entity is assumed to have them
+  get batteryInstalled(): boolean {
+    return !this.entityState(ENTITIES.batteryInstalled) || this.isOn(ENTITIES.batteryInstalled);
+  }
+
   get batteryLow(): boolean {
     const pct = this.num(ENTITIES.battery);
     return this.onBattery && Number.isFinite(pct) && pct <= 15;
