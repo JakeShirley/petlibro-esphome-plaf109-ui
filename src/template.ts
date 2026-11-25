@@ -141,6 +141,17 @@ function numberStepper(remote: PlaRemote, entity: Entity, unit: string, { zeroTe
   `;
 }
 
+function batteryPill(remote: PlaRemote): TemplateResult {
+  const icon = remote.isOn(ENTITIES.acPower) ? batteryChargingIcon : batteryIcon;
+  const color = remote.batteryLow ? "text-danger" : "text-text-muted";
+  return html`
+    <div class="flex items-center gap-0.5 bg-card rounded-full px-2 py-1.5 shadow text-xs font-semibold text-text" ?hidden=${!remote.batteryInstalled}>
+      ${msIcon(icon, `w-3.5 h-3.5 ${color}`)}
+      <span class="leading-none">${remote.batteryPctText}</span>
+    </div>
+  `;
+}
+
 export function renderTemplate(remote: PlaRemote): TemplateResult {
   const nextMeal = remote.nextMeal;
   return html`
@@ -152,13 +163,7 @@ export function renderTemplate(remote: PlaRemote): TemplateResult {
           <span>${remote.connLabel}</span>
         </div>
       </div>
-      <div class="flex items-center gap-0.5 bg-card rounded-full px-2 py-1.5 shadow text-xs font-semibold text-text">
-        ${msIcon(
-    remote.isOn(ENTITIES.acPower) ? batteryChargingIcon : batteryIcon,
-    `w-3.5 h-3.5 ${remote.batteryLow ? "text-danger" : "text-text-muted"}`,
-  )}
-        <span class="leading-none">${remote.batteryPctText}</span>
-      </div>
+      ${batteryPill(remote)}
     </header>
 
     <main>

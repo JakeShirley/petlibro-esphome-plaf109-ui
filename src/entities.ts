@@ -19,6 +19,7 @@ export const ENTITIES = {
   missedMealReason: { domain: "text_sensor", name: "Missed Meal Reason" },
   acPower: { domain: "binary_sensor", name: "AC Power Present" },
   battery: { domain: "sensor", name: "Battery Percentage" },
+  batteryInstalled: { domain: "binary_sensor", name: "Battery Installed" },
   chamberTemp: { domain: "sensor", name: "Chamber Temperature" },
   coolingTarget: { domain: "number", name: "Food Cooling Target" },
   arrivalTimeout: { domain: "number", name: "Arrival Timeout" },
